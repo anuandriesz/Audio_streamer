@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Audio Streamer</string>
+    <string name="main_header">Hello..</string>
+    <string name="upload_btn_text">Start Streaming</string>
+    <string name="cancel_btn_text">Cancel</string>
+</resources>
