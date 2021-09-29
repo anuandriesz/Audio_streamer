@@ -72,4 +72,10 @@ dependencies {
 
     //Lottie
     implementation "com.airbnb.android:lottie:3.4.2"
+
+    //temp
+    implementation "org.jetbrains.anko:anko-commons:0.10.0"
+
+    //rx
+    implementation "com.tinder.scarlet:stream-adapter-rxjava2:0.1.10"
 }

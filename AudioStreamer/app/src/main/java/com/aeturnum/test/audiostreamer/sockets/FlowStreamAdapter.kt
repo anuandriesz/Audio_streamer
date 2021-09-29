@@ -14,7 +14,6 @@ class FlowStreamAdapter<T> : StreamAdapter<T, Flow<T>> {
             override fun onComplete() {
                 close()
             }
-
             override fun onError(throwable: Throwable) {
                 close(cause = throwable)
             }

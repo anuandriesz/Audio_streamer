@@ -12,22 +12,36 @@ import androidx.annotation.NonNull
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.Observer
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
 import com.aeturnum.test.audiostreamer.databinding.MainFragmentBinding
+import com.aeturnum.test.audiostreamer.sockets.AudioStreamerService
+import com.aeturnum.test.audiostreamer.sockets.models.Subscribe
+import com.tinder.scarlet.Event
+import com.tinder.scarlet.WebSocket
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
+import org.jetbrains.anko.doAsync
+import org.jetbrains.anko.uiThread
 import timber.log.Timber
 import java.io.*
+import javax.inject.Inject
+import kotlin.reflect.typeOf
 
 @AndroidEntryPoint
 class MainFragment: Fragment() {
     private lateinit var  mediaPlayer:MediaPlayer
     private val selectAudio = 2
+    private lateinit var viewModel: MainViewModel
+    private lateinit var binding: MainFragmentBinding
+
     companion object {
         fun newInstance() = MainFragment()
     }
-
-    private val viewModel: MainViewModel by viewModels()
-    private lateinit var binding: MainFragmentBinding
-
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
@@ -35,8 +49,10 @@ class MainFragment: Fragment() {
         binding = MainFragmentBinding.inflate(inflater, container, false)
         return binding.root
     }
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        viewModel = ViewModelProvider(this).get(MainViewModel::class.java)
         binding.btStartStreamingAudio.setOnClickListener{
             openGalleryAudio()
         }
@@ -49,6 +65,19 @@ class MainFragment: Fragment() {
                 binding.txtAudioInfo.text = "Wrong Audio data format. Please check with the server.."
             }
         })
+        viewModel.textDataReceived.observe(viewLifecycleOwner, {
+            binding.txtAudioInfo.text = "$it"
+        })
+    }
+    private fun sendAudio(data:ByteArray){
+      doAsync {
+            // do your background thread task
+            viewModel.sendAudioData(data)
+            uiThread {
+                // use result here if you want to update ui
+                binding.txtAudioInfo.text = "Audio Upload in progress.."
+            }
+        }
     }
     //open Mobile gallery
     private fun  openGalleryAudio(){
@@ -68,8 +97,7 @@ class MainFragment: Fragment() {
                 val binaryAudioData =  audioToBinaryConverter(file)
                 //PUBLISH Data
                 binding.txtAudioInfo.text = "Audio data uploading .."
-                //fixme DATA PUBLISH.....................
-                //getService().sendAudio(binaryAudioData)
+                sendAudio(binaryAudioData)
             }
         }
     }

@@ -4,22 +4,32 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.aeturnum.test.audiostreamer.sockets.AudioStreamerService
-import com.aeturnum.test.audiostreamer.sockets.models.Subscribe
 import com.tinder.scarlet.WebSocket
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
 @HiltViewModel
 class MainViewModel @Inject constructor(
-    service: AudioStreamerService,
+    var service: AudioStreamerService,
 ) : ViewModel() {
+
     private val _audioData = MutableLiveData<ByteArray?>()
     val audioDataReceived: LiveData<ByteArray?> = _audioData
 
+    private val _textData = MutableLiveData<String?>()
+    val textDataReceived: LiveData<String?> = _textData
+
+    //fixme --- (connection unstable issue)
+    fun sendAudioData(data:ByteArray){
+        viewModelScope.launch(Dispatchers.IO) {
+            service.sendAudio(data)
+        }
+    }
 
     init {
         service.observeWebSocket()
@@ -30,15 +40,10 @@ class MainViewModel @Inject constructor(
                 }
 
                 if (event is WebSocket.Event.OnConnectionOpened<*>) {
-                    service.subscribe(
-                        Subscribe(
-                            itemType = "Audio type",
-                            channels = listOf("Admin")
-                        )
-                    )
+                    service.subscribe("Subscribe from mobile client  ")
                 }
-            }
-            .launchIn(viewModelScope)
+            }.launchIn(viewModelScope)
+
 
         service.observeAudio()
             .flowOn(Dispatchers.IO)
@@ -46,5 +51,13 @@ class MainViewModel @Inject constructor(
                 _audioData.postValue(it)
             }
             .launchIn(viewModelScope)
+
+        service.observeText()
+            .flowOn(Dispatchers.IO)
+            .onEach {
+                _textData.postValue(it)
+            }
+            .launchIn(viewModelScope)
+
     }
 }
