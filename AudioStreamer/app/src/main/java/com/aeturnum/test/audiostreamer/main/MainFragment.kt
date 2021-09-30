@@ -5,11 +5,14 @@ import android.media.MediaPlayer
 import android.net.Uri
 import android.os.Bundle
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.NonNull
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Observer
@@ -29,8 +32,13 @@ import org.jetbrains.anko.doAsync
 import org.jetbrains.anko.uiThread
 import timber.log.Timber
 import java.io.*
+import java.util.jar.Manifest
 import javax.inject.Inject
 import kotlin.reflect.typeOf
+import android.os.Build
+import android.os.Environment
+import java.lang.Exception
+import java.net.URI
 
 @AndroidEntryPoint
 class MainFragment: Fragment() {
@@ -38,7 +46,8 @@ class MainFragment: Fragment() {
     private val selectAudio = 2
     private lateinit var viewModel: MainViewModel
     private lateinit var binding: MainFragmentBinding
-
+    private val PERMISSION_REQUEST_CODE = 5
+    private var recordedFilePath = ""
     companion object {
         fun newInstance() = MainFragment()
     }
@@ -56,6 +65,32 @@ class MainFragment: Fragment() {
         binding.btStartStreamingAudio.setOnClickListener{
             openGalleryAudio()
         }
+        binding.btStartRecording.setOnClickListener{
+            binding.btStopRecording.visibility = View.VISIBLE
+           //Permission
+            val permissionArrays = arrayOf<String>(
+                "android.permission.RECORD_AUDIO"
+            )
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                requestPermissions(permissionArrays, PERMISSION_REQUEST_CODE)
+            } else {
+                binding.txtAudioInfo.text = "Audio recording .."
+                WavRecorder(requireContext()).startRecording()
+            }
+        }
+        binding.btStopRecording.setOnClickListener{
+            binding.txtAudioInfo.text = "Audio recording Stopped .."
+            recordedFilePath =  WavRecorder(requireContext()).stopRecording()
+            binding.btPlayAudio.visibility = View.VISIBLE
+            binding.btStopRecording.visibility = View.GONE
+        }
+        binding.btPlayAudio.setOnClickListener {
+            val myUri = Uri.parse(recordedFilePath)
+            val file = File(createCopyAndReturnRealPath(requireContext(),myUri).toString())
+            val binaryAudioData =  audioToBinaryConverter(file)
+            playMp3(binaryAudioData)
+        }
         viewModel.audioDataReceived.observe(viewLifecycleOwner, {
             binding.btStopAudio.visibility = View.VISIBLE
             binding.txtAudioInfo.text = "Audio data received.."
@@ -68,6 +103,32 @@ class MainFragment: Fragment() {
         viewModel.textDataReceived.observe(viewLifecycleOwner, {
             binding.txtAudioInfo.text = "$it"
         })
+    }
+    override fun onRequestPermissionsResult(requestCode: Int,
+                                            permissions: Array<String>, grantResults: IntArray) {
+        when (requestCode) {
+            PERMISSION_REQUEST_CODE -> {
+                // If request is cancelled, the result arrays are empty.
+                if ((grantResults.isNotEmpty() &&
+                            grantResults[0] == PackageManager.PERMISSION_GRANTED)) {
+                    binding.txtAudioInfo.text = "Audio recording .."
+                    WavRecorder(requireContext()).startRecording()
+                } else {
+                    // Explain to the user that the feature is unavailable because
+                    // the features requires a permission that the user has denied.
+                    // At the same time, respect the user's decision. Don't link to
+                    // system settings in an effort to convince the user to change
+                    // their decision.
+                }
+                return
+            }
+
+            // Add other 'when' lines to check for other
+            // permissions this app might request.
+            else -> {
+                // Ignore all other requests.
+            }
+        }
     }
     private fun sendAudio(data:ByteArray){
       doAsync {

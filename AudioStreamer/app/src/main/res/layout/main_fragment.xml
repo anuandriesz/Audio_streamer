@@ -24,7 +24,7 @@
         <com.airbnb.lottie.LottieAnimationView
             android:layout_width="match_parent"
             android:layout_height="200dp"
-            android:layout_margin="30dp"
+            android:layout_margin="40dp"
             android:scaleType="centerInside"
             app:lottie_autoPlay="true"
             app:lottie_loop="true"
@@ -53,7 +53,7 @@
                     android:textColor="@color/black"
                     android:layout_gravity="center"
                     android:gravity="center"
-                    android:text="Please select your music file to  strat streaming..."/>
+                    android:text=""/>
             </LinearLayout>
         </LinearLayout>
     </LinearLayout>
@@ -70,6 +70,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/upload_btn_text"
+            android:visibility="gone"
             android:layout_marginBottom="10dp"
             style="@style/primary_button"
             />
@@ -80,6 +81,34 @@
             android:text="Stop Audio"
             android:visibility="gone"
             style="@style/alternative_button"
+            android:layout_marginBottom="10dp"
+            />
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/bt_start_recording"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Start Recording"
+            android:visibility="visible"
+            style="@style/primary_button"
+            android:layout_marginBottom="10dp"
+            />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/bt_stop_recording"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Stop Recording"
+            android:visibility="gone"
+            style="@style/alternative_button"
+            android:layout_marginBottom="10dp"
+            />
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/bt_play_audio"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Play Audio"
+            android:visibility="gone"
+            style="@style/primary_button"
             android:layout_marginBottom="10dp"
             />
     </LinearLayout>
