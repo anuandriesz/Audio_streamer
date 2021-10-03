@@ -39,7 +39,6 @@ import android.os.Build
 import android.os.Environment
 import java.lang.Exception
 import java.net.URI
-
 @AndroidEntryPoint
 class MainFragment: Fragment() {
     private lateinit var  mediaPlayer:MediaPlayer
@@ -76,20 +75,19 @@ class MainFragment: Fragment() {
                 requestPermissions(permissionArrays, PERMISSION_REQUEST_CODE)
             } else {
                 binding.txtAudioInfo.text = "Audio recording .."
-                WavRecorder(requireContext()).startRecording()
+//                WavRecorder(requireContext()).startRecording()
+                RecordPlaybackHandler(requireContext()).startRecordingAudio()
             }
         }
         binding.btStopRecording.setOnClickListener{
             binding.txtAudioInfo.text = "Audio recording Stopped .."
-            recordedFilePath =  WavRecorder(requireContext()).stopRecording()
+           // recordedFilePath =  WavRecorder(requireContext()).stopRecording()
+            RecordPlaybackHandler(requireContext()).stopRecordingAudio()
             binding.btPlayAudio.visibility = View.VISIBLE
             binding.btStopRecording.visibility = View.GONE
         }
         binding.btPlayAudio.setOnClickListener {
-            val myUri = Uri.parse(recordedFilePath)
-            val file = File(createCopyAndReturnRealPath(requireContext(),myUri).toString())
-            val binaryAudioData =  audioToBinaryConverter(file)
-            playMp3(binaryAudioData)
+            RecordPlaybackHandler(requireContext()).playAudio()
         }
         viewModel.audioDataReceived.observe(viewLifecycleOwner, {
             binding.btStopAudio.visibility = View.VISIBLE
@@ -112,7 +110,8 @@ class MainFragment: Fragment() {
                 if ((grantResults.isNotEmpty() &&
                             grantResults[0] == PackageManager.PERMISSION_GRANTED)) {
                     binding.txtAudioInfo.text = "Audio recording .."
-                    WavRecorder(requireContext()).startRecording()
+//                    WavRecorder(requireContext()).startRecording()
+                    RecordPlaybackHandler(requireContext()).startRecordingAudio()
                 } else {
                     // Explain to the user that the feature is unavailable because
                     // the features requires a permission that the user has denied.
