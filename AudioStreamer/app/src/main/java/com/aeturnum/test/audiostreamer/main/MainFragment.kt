@@ -39,7 +39,6 @@ import android.os.Build
 import android.os.Environment
 import java.lang.Exception
 import java.net.URI
-
 @AndroidEntryPoint
 class MainFragment: Fragment() {
     private lateinit var  mediaPlayer:MediaPlayer

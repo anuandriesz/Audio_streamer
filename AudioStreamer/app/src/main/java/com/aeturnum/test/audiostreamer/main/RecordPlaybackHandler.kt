@@ -18,7 +18,22 @@ import android.media.AudioAttributes
 import android.media.MediaPlayer
 import java.lang.IllegalArgumentException
 
+/*
+NOTE 1
+ For applications where performance isn’t a priority, or audio makes up a small component of the functionality,
+ MediaRecorder and MediaPlayer might be an ideal combination to capture and play back audio without writing much complex code.
 
+ Note 2
+
+  to perform some audio processing or otherwise need real-time audio, consider using AudioRecord and AudioTrack. The process of
+  reading and writing data is more involved than using MediaRecorder, and any compression or
+   transcoding can’t be done using the AudioRecord APIs.
+
+Note 3
+For audio playback option ExoPlayer -->useful for streaming media over the internet(Maintained by Google but not a part of SDK)
+ExoPlayer doesn’t support PCM-encoded files (an easy fix is to add a WAV header to the raw file).
+
+ */
 class RecordPlaybackHandler(val context: Context) {
     var TAG = "RecordPlaybackHandler Class "
     var mediaRecorder: MediaRecorder? = null
