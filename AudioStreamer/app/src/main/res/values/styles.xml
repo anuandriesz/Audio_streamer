@@ -12,6 +12,12 @@
         <item name="strokeColor">@color/primaryTextColor</item>
         <item name="strokeWidth">@dimen/mtrl_btn_stroke_size</item>
     </style>
+    <style name="alternative_button2" parent="Widget.MaterialComponents.Button">
+        <item name="android:background">@color/material_on_background_disabled</item>
+        <item name="backgroundTint">#333333</item>
+        <item name="strokeColor">@color/primaryTextColor</item>
+        <item name="strokeWidth">@dimen/mtrl_btn_stroke_size</item>
+    </style>
     <style name="primary_button" parent="Widget.MaterialComponents.Button">
         <item name="android:background">@drawable/bg_primary_btn</item>
         <item name="strokeColor">@color/primaryTextColor</item>
