@@ -6,7 +6,8 @@
         <entry key="..\:/Users/AnuradhaAndriesz/AndroidStudioProjects/AudioStreamer/app/src/main/res/drawable/bg_primary_btn.xml" value="0.2755208333333333" />
         <entry key="..\:/Users/AnuradhaAndriesz/AndroidStudioProjects/AudioStreamer/app/src/main/res/layout/activity_main.xml" value="0.259375" />
         <entry key="..\:/Users/AnuradhaAndriesz/AndroidStudioProjects/AudioStreamer/app/src/main/res/layout/main_fragment.xml" value="0.259375" />
-        <entry key="..\:/Users/AnuradhaAndriesz/AndroidStudioProjects/Socket_Audio_streamer/AudioStreamer/app/src/main/res/layout/main_fragment.xml" value="0.125" />
+        <entry key="..\:/Users/AnuradhaAndriesz/AndroidStudioProjects/Socket_Audio_streamer/AudioStreamer/app/src/main/res/layout/activity_audio_recording.xml" value="0.259375" />
+        <entry key="..\:/Users/AnuradhaAndriesz/AndroidStudioProjects/Socket_Audio_streamer/AudioStreamer/app/src/main/res/layout/main_fragment.xml" value="0.264" />
       </map>
     </option>
   </component>

@@ -1,44 +1,26 @@
 package com.aeturnum.test.audiostreamer.main
+import android.app.Activity
 import android.content.ContentResolver
 import android.content.Context
 import android.media.MediaPlayer
 import android.net.Uri
-import android.os.Bundle
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.*
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.NonNull
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.ContextCompat
+import androidx.core.app.ActivityCompat
 import androidx.fragment.app.Fragment
-import androidx.fragment.app.viewModels
-import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.viewModelScope
 import com.aeturnum.test.audiostreamer.databinding.MainFragmentBinding
-import com.aeturnum.test.audiostreamer.sockets.AudioStreamerService
-import com.aeturnum.test.audiostreamer.sockets.models.Subscribe
-import com.tinder.scarlet.Event
-import com.tinder.scarlet.WebSocket
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
 import org.jetbrains.anko.doAsync
 import org.jetbrains.anko.uiThread
 import timber.log.Timber
 import java.io.*
-import java.util.jar.Manifest
-import javax.inject.Inject
-import kotlin.reflect.typeOf
-import android.os.Build
-import android.os.Environment
-import java.lang.Exception
-import java.net.URI
 @AndroidEntryPoint
 class MainFragment: Fragment() {
     private lateinit var  mediaPlayer:MediaPlayer
@@ -47,6 +29,9 @@ class MainFragment: Fragment() {
     private lateinit var binding: MainFragmentBinding
     private val PERMISSION_REQUEST_CODE = 5
     private var recordedFilePath = ""
+    private var  audioRecordingStart = false
+    private var isMp3RecorderStarted = false
+    private var  isAudioPlaying = false
     companion object {
         fun newInstance() = MainFragment()
     }
@@ -61,34 +46,76 @@ class MainFragment: Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         viewModel = ViewModelProvider(this).get(MainViewModel::class.java)
+        if (ActivityCompat.checkSelfPermission(
+                requireContext(),
+                android.Manifest.permission.RECORD_AUDIO
+            ) != PackageManager.PERMISSION_GRANTED
+        ) { // get permission
+            ActivityCompat.requestPermissions(
+                requireContext() as Activity,
+                arrayOf(android.Manifest.permission.RECORD_AUDIO),
+                PERMISSION_REQUEST_CODE
+            )
+        }
         binding.btStartStreamingAudio.setOnClickListener{
             openGalleryAudio()
         }
-        binding.btStartRecording.setOnClickListener{
-            binding.btStopRecording.visibility = View.VISIBLE
-           //Permission
-            val permissionArrays = arrayOf<String>(
-                "android.permission.RECORD_AUDIO"
-            )
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                requestPermissions(permissionArrays, PERMISSION_REQUEST_CODE)
-            } else {
-                binding.txtAudioInfo.text = "Audio recording .."
-//                WavRecorder(requireContext()).startRecording()
-                RecordPlaybackHandler(requireContext()).startRecordingAudio()
+        //mp3 recording handler
+        binding.btAudioRecordingMp3.setOnClickListener {
+            if(!isMp3RecorderStarted){
+                isMp3RecorderStarted = true
+                binding.btAudioRecordingMp3.text = "Stop Recording (.mp3)"
+                binding.txtAudioInfo.text = " Audio recording started .."
+                Mp3RecordPlaybackHandler(requireContext()).startRecordingMedia()
+            }else {
+                isMp3RecorderStarted = false
+                binding.btAudioRecordingMp3.text = " Record (.mp3)"
+                binding.txtAudioInfo.text = "Audio recording stopped .."
+                Mp3RecordPlaybackHandler(requireContext()).stopRecordingMedia()
+                binding.btPlayAudioMp3.visibility = View.VISIBLE
             }
         }
-        binding.btStopRecording.setOnClickListener{
-            binding.txtAudioInfo.text = "Audio recording Stopped .."
-           // recordedFilePath =  WavRecorder(requireContext()).stopRecording()
-            RecordPlaybackHandler(requireContext()).stopRecordingAudio()
-            binding.btPlayAudio.visibility = View.VISIBLE
-            binding.btStopRecording.visibility = View.GONE
+
+        //.wave recording event handler
+        binding.btAudioRecording.setOnClickListener{
+            if(!audioRecordingStart) {
+                audioRecordingStart = true
+                binding.btAudioRecording.text = "Stop Recoding (.Wav)"
+                WaveRecordingHandler(requireContext()).startRecordingAudio()
+            }else {
+                audioRecordingStart = false
+                binding.btAudioRecording.text = "Record (.Wav)"
+                binding.txtAudioInfo.text = "Audio recording stopped .."
+                WaveRecordingHandler(requireContext()).stopRecordingAudio()
+                binding.btPlayAudioWave.visibility = View.VISIBLE
+            }
         }
-        binding.btPlayAudio.setOnClickListener {
-            RecordPlaybackHandler(requireContext()).playAudio()
+
+        //Audio play /pause function .wave
+        binding.btPlayAudioWave.setOnClickListener {
+            if(!isAudioPlaying) {
+                isAudioPlaying = true
+                binding.btPlayAudioWave.text = "Pause"
+                WaveRecordingHandler(requireContext()).playAudio()
+            }else {
+                isAudioPlaying = false
+                binding.btPlayAudioWave.text = "Play"
+                WaveRecordingHandler(requireContext()).stopAudio()
+            }
         }
+        //Play/pause mp3 audios
+        binding.btPlayAudioMp3.setOnClickListener {
+            if(!isAudioPlaying) {
+                isAudioPlaying = true
+                binding.btPlayAudioMp3.text = "Pause"
+                Mp3RecordPlaybackHandler(requireContext()).playMedia()
+            }else {
+                isAudioPlaying = false
+                binding.btPlayAudioMp3.text = "Play"
+                Mp3RecordPlaybackHandler(requireContext()).stopMedia()
+            }
+        }
+
         viewModel.audioDataReceived.observe(viewLifecycleOwner, {
             binding.btStopAudio.visibility = View.VISIBLE
             binding.txtAudioInfo.text = "Audio data received.."
@@ -110,8 +137,6 @@ class MainFragment: Fragment() {
                 if ((grantResults.isNotEmpty() &&
                             grantResults[0] == PackageManager.PERMISSION_GRANTED)) {
                     binding.txtAudioInfo.text = "Audio recording .."
-//                    WavRecorder(requireContext()).startRecording()
-                    RecordPlaybackHandler(requireContext()).startRecordingAudio()
                 } else {
                     // Explain to the user that the feature is unavailable because
                     // the features requires a permission that the user has denied.
