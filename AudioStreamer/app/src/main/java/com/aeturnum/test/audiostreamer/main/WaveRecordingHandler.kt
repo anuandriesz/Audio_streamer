@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.pm.PackageManager
 import android.media.*
+import android.media.AudioManager.STREAM_MUSIC
 import android.os.Environment
 import android.util.Log
 import android.widget.Toast
@@ -28,9 +29,9 @@ class WaveRecordingHandler(val context: Context): Activity() {
     var isRecordingAudio = false
     var isPlayingAudio = false
 
-     var fileNameAudio: String? =  Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).absolutePath +  "/$filenamePcm"
-     var fileNameWave: String? =  Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).absolutePath +  "/$fileNameWav"
-
+    // var fileNameAudio: String? =  Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).absolutePath +  "/$filenamePcm"
+     //var fileNameWave: String? =  Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).absolutePath +  "/$fileNameWav"
+     var fileNameWave =  Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).absolutePath + "/$filenamePcm" + ".pcm"
     //---------------------------------------------------Recording Audio --------------------------------------------------------------------------
     fun startRecordingAudio(){
         val fileAudio = File(fileNameWave)
@@ -68,7 +69,8 @@ class WaveRecordingHandler(val context: Context): Activity() {
             isRecordingAudio = true;
             fileNameWave?.let { Helper.setLastRecFilePath(it) }
             recordingThread = thread(true) {
-                writeAudioDataToFile(fileNameWave!!)
+                //writeAudioDataToFile(fileNameWave!!)
+                writeAudioDataToFile()
             }
         }
     }
@@ -77,11 +79,49 @@ class WaveRecordingHandler(val context: Context): Activity() {
             isRecordingAudio = false; // triggers recordingThread to exit while loop
         }
     }
-    //Write to file
+    //pcm
+    private fun writeAudioDataToFile() { // called inside Runnable of recordingThread
+        val data =
+            ByteArray(BUFFER_SIZE_RECORDING / 2)
+        // assign size so that bytes are read in in chunks inferior to AudioRecord internal buffer size
+        var outputStream: FileOutputStream? = null
+        try {
+            outputStream = FileOutputStream(fileNameWave)
+        } catch (e: FileNotFoundException) {
+            // handle error
+            Toast.makeText(this, "Couldn't find file to write to", Toast.LENGTH_SHORT).show()
+            Log.e(TAG, "file not found for file name $fileNameWave, $e")
+            return
+        }
+        while (isRecordingAudio) {
+            val read = audioRecord!!.read(data, 0, data.size)
+            try {
+                outputStream!!.write(data, 0, read)
+            } catch (e: IOException) {
+                Toast.makeText(this, "Couldn't write to file while recording", Toast.LENGTH_SHORT)
+                    .show()
+                Log.d(TAG, "IOException while recording with AudioRecord, $e")
+                e.printStackTrace()
+            }
+        }
+        try { // clean up file writing operations
+            outputStream!!.flush()
+            outputStream.close()
+        } catch (e: IOException) {
+            Log.e(TAG, "exception while closing output stream $e")
+            e.printStackTrace()
+        }
+        audioRecord!!.stop()
+        audioRecord!!.release()
+        audioRecord = null
+        recordingThread = null
+    }
+    //Write to file .wav
     private fun writeAudioDataToFile(path:String) {
         val dataWav = arrayListOf<Byte>()
-        val data =
-            ByteArray(BUFFER_SIZE_RECORDING / 2) // assign size so that bytes are read in in chunks inferior to AudioRecord internal buffer size
+        val data = ByteArray(BUFFER_SIZE_RECORDING / 2)
+        // assign size so that bytes are read in in chunks inferior to AudioRecord internal buffer size
+
         var wavOut: FileOutputStream? = null
         try {
             wavOut = FileOutputStream(path)
@@ -91,11 +131,13 @@ class WaveRecordingHandler(val context: Context): Activity() {
         } catch (e: FileNotFoundException) {
             // handle error
             Toast.makeText(context, "Couldn't find file to write to", Toast.LENGTH_SHORT).show()
-            Log.e(TAG, "file not found for file name " + fileNameAudio + ", " + e.toString())
+            Log.e(TAG, "file not found for file name " + fileNameWave + ", " + e.toString())
             return
         }
+
         while (isRecordingAudio) {
             val read = audioRecord!!.read(data, 0, data.size)
+
             try {
                 for (byte in data)
                     dataWav.add(byte)
@@ -103,6 +145,7 @@ class WaveRecordingHandler(val context: Context): Activity() {
                 e.printStackTrace()
             }
             updateHeaderInformation(dataWav)
+
             try {
                 wavOut.write(dataWav.toByteArray(), 0, read)
             } catch (e: IOException) {
@@ -112,6 +155,7 @@ class WaveRecordingHandler(val context: Context): Activity() {
                 e.printStackTrace()
             }
         }
+
         try { // clean up file writing operations
             wavOut.flush()
             wavOut.close()
@@ -208,14 +252,15 @@ class WaveRecordingHandler(val context: Context): Activity() {
     fun playAudio(){
         if (audioTrack == null) {
             audioTrack = AudioTrack(
-                AudioAttributes.Builder().setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).setUsage(
-                    AudioAttributes.USAGE_MEDIA).build(),
+                AudioAttributes.Builder()
+                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC )
+                    .setUsage(AudioAttributes.USAGE_MEDIA).build(),
                 AudioFormat.Builder()
-                    .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                    .setEncoding(RECORDER_AUDIO_ENCODING)
                     .setSampleRate(RECORDER_SAMPLE_RATE)
-                    .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                    .setChannelMask(PLAYBACK_CHANNEL)
                     .build(),
-                BUFFER_SIZE_RECORDING,
+                AudioTrack.getMinBufferSize(RECORDER_SAMPLE_RATE,PLAYBACK_CHANNEL,RECORDER_AUDIO_ENCODING),
                 AudioTrack.MODE_STREAM,
                 AudioManager.AUDIO_SESSION_ID_GENERATE
             );
@@ -239,27 +284,30 @@ class WaveRecordingHandler(val context: Context): Activity() {
     fun stopAudio(){
         isPlayingAudio = false
     }
+
     //Read Audio from a file
-    private  fun readAudioDataFromFile(path:String?) { // called inside Runnable of playingThread
+    private  fun readAudioDataFromFile(path:String?) {
         var fileInputStream: FileInputStream? = null
-        try {
-            fileInputStream = FileInputStream(path)
+        fileInputStream = try {
+            FileInputStream(path)
         } catch (e: IOException) {
-            Toast.makeText(context, "Couldn't open file input stream, IOException", Toast.LENGTH_SHORT)
-                .show()
-            Log.e(TAG, "could not create input stream before using AudioTrack $e")
+            //Toast.makeText(this, "Couldn't open file input stream, IOException", Toast.LENGTH_SHORT)
+               // .show()
+            Log.d(TAG, "could not create input stream before using AudioTrack $e")
             e.printStackTrace()
             return
         }
+
         val data = ByteArray(BUFFER_SIZE_PLAYING / 2)
         var i = 0
+
         while (isPlayingAudio && i != -1) { // continue until run out of data or user stops playback
             try {
-                i = fileInputStream.read(data)
+                i = fileInputStream!!.read(data)
                 audioTrack!!.write(data, 0, i)
             } catch (e: IOException) {
                 Toast.makeText(
-                    context,
+                    this,
                     "Couldn't read from file while playing audio, IOException",
                     Toast.LENGTH_SHORT
                 ).show()
@@ -269,13 +317,12 @@ class WaveRecordingHandler(val context: Context): Activity() {
             }
         }
         try { // finish file operations
-            fileInputStream.close()
+            fileInputStream!!.close()
         } catch (e: IOException) {
             Log.e(TAG, "Could not close file input stream $e")
             e.printStackTrace()
             return
         }
-
         // clean up resources
         isPlayingAudio = false
         audioTrack!!.stop()
@@ -287,20 +334,22 @@ class WaveRecordingHandler(val context: Context): Activity() {
     companion object {
         // for raw audio, use MediaRecorder.AudioSource.UNPROCESSED, see note in MediaRecorder section
         const val RECORDER_SAMPLE_RATE = 44100
-        const val RECORDER_CHANNELS: Int = android.media.AudioFormat.CHANNEL_IN_MONO
+        const val RECORDER_CHANNELS: Int = android.media.AudioFormat.CHANNEL_IN_STEREO
+        const val PLAYBACK_CHANNEL: Int = android.media.AudioFormat.CHANNEL_OUT_STEREO
         const val RECORDER_AUDIO_ENCODING: Int = android.media.AudioFormat.ENCODING_PCM_16BIT
         val BUFFER_SIZE_RECORDING = AudioRecord.getMinBufferSize(
             RECORDER_SAMPLE_RATE,RECORDER_CHANNELS,RECORDER_AUDIO_ENCODING
         )
         val BUFFER_SIZE_PLAYING = AudioTrack.getMinBufferSize(
-            RECORDER_SAMPLE_RATE,RECORDER_CHANNELS,RECORDER_AUDIO_ENCODING
+            RECORDER_SAMPLE_RATE,PLAYBACK_CHANNEL,RECORDER_AUDIO_ENCODING
         )
         const val BITS_PER_SAMPLE: Short = 16
         const val NUMBER_CHANNELS: Short = 1
         const val BYTE_RATE = RECORDER_SAMPLE_RATE * NUMBER_CHANNELS * 16 / 8
-        val filenamePcm = "mclef_recording_${System.currentTimeMillis()}.pcm"
+
+        val filenamePcm = "mclef_recording_${System.currentTimeMillis()}"
         val filenamemp3 = "mclef_recording_${System.currentTimeMillis()}.3gp"
-        val fileNameWav = "mclef_recording_${System.currentTimeMillis()}.wav"
+        val fileNameWav = "mclef_recording_${System.currentTimeMillis()}"
 
     }
 }
