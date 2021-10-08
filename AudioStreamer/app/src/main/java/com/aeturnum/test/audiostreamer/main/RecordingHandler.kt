@@ -4,38 +4,33 @@ import android.app.Activity
 import android.content.Context
 import android.content.pm.PackageManager
 import android.media.*
-import android.media.AudioManager.STREAM_MUSIC
 import android.os.Environment
 import android.util.Log
 import android.widget.Toast
 import androidx.core.app.ActivityCompat
+import com.aeturnum.test.audiostreamer.sockets.AudioStreamerService
+import com.aeturnum.test.audiostreamer.utils.ApiService
 import com.aeturnum.test.audiostreamer.utils.Helper
 import java.io.*
 import kotlin.concurrent.thread
-/*
-NOTE 1
-Problems
----> Recording not clear enough
----> Playback exception
- */
-class WaveRecordingHandler(val context: Context): Activity() {
-    private var TAG = "WaveRecordingHandler Class "
+class RecordingHandler(val context: Context): Activity() {
+    private var TAG = "$RecordingHandler.javaClass"
     var audioRecord: AudioRecord? = null
     var audioTrack: AudioTrack? = null
-
+    private lateinit var apiService: AudioStreamerService
     private var recordingThread: Thread? = null
     private var playingThread: Thread? = null
 
     var isRecordingAudio = false
     var isPlayingAudio = false
 
-    // var fileNameAudio: String? =  Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).absolutePath +  "/$filenamePcm"
-     //var fileNameWave: String? =  Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).absolutePath +  "/$fileNameWav"
-     var fileNameWave =  Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).absolutePath + "/$filenamePcm" + ".pcm"
+    var fileNameWave =  Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).absolutePath + "/$filename" + ".mp3"
     //---------------------------------------------------Recording Audio --------------------------------------------------------------------------
     fun startRecordingAudio(){
+
         val fileAudio = File(fileNameWave)
-        if (!fileAudio.exists()) { // create empty files if needed
+        // create empty files if needed
+        if (!fileAudio.exists()) {
             try {
                 fileAudio.createNewFile()
             } catch (e: IOException) {
@@ -43,31 +38,29 @@ class WaveRecordingHandler(val context: Context): Activity() {
                 e.printStackTrace()
             }
         }
-        if (audioRecord == null) { // safety check
-            if (ActivityCompat.checkSelfPermission(
-                    context,
-                    Manifest.permission.RECORD_AUDIO
-                ) != PackageManager.PERMISSION_GRANTED
-            ) {
+
+        if (audioRecord == null) {
+            if (ActivityCompat.checkSelfPermission(context,Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
                 return
             }
+            //Audio recorder object initialization
             audioRecord = AudioRecord(
                 MediaRecorder.AudioSource.MIC,
                 RECORDER_SAMPLE_RATE,RECORDER_CHANNELS,
                 RECORDER_AUDIO_ENCODING, BUFFER_SIZE_RECORDING
             )
 
-            if (audioRecord!!.state != AudioRecord.STATE_INITIALIZED) { // check for proper initialization
+            if (audioRecord!!.state != AudioRecord.STATE_INITIALIZED) {
+                // check for proper initialization
                 Log.e(TAG, "error initializing AudioRecord");
-                Toast.makeText(context, "Couldn't initialize AudioRecord, check configuration", Toast.LENGTH_SHORT).show();
-                return;
+                return
             }
 
             audioRecord!!.startRecording();
-            Log.d(TAG, "recording started with AudioRecord");
+            isRecordingAudio = true
+            //Store filename
+            fileNameWave.let { Helper.setLastRecFilePath(it) }
 
-            isRecordingAudio = true;
-            fileNameWave?.let { Helper.setLastRecFilePath(it) }
             recordingThread = thread(true) {
                 //writeAudioDataToFile(fileNameWave!!)
                 writeAudioDataToFile()
@@ -75,14 +68,14 @@ class WaveRecordingHandler(val context: Context): Activity() {
         }
     }
     fun stopRecordingAudio(){
+        apiService = ApiService.client!!
         if (audioRecord != null) {
             isRecordingAudio = false; // triggers recordingThread to exit while loop
         }
     }
     //pcm
-    private fun writeAudioDataToFile() { // called inside Runnable of recordingThread
-        val data =
-            ByteArray(BUFFER_SIZE_RECORDING / 2)
+    private fun writeAudioDataToFile() {
+        val data = ByteArray(BUFFER_SIZE_RECORDING / 2)
         // assign size so that bytes are read in in chunks inferior to AudioRecord internal buffer size
         var outputStream: FileOutputStream? = null
         try {
@@ -97,6 +90,7 @@ class WaveRecordingHandler(val context: Context): Activity() {
             val read = audioRecord!!.read(data, 0, data.size)
             try {
                 outputStream!!.write(data, 0, read)
+                // clean up file writing operations
             } catch (e: IOException) {
                 Toast.makeText(this, "Couldn't write to file while recording", Toast.LENGTH_SHORT)
                     .show()
@@ -104,8 +98,8 @@ class WaveRecordingHandler(val context: Context): Activity() {
                 e.printStackTrace()
             }
         }
-        try { // clean up file writing operations
-            outputStream!!.flush()
+        try {
+            outputStream.flush()
             outputStream.close()
         } catch (e: IOException) {
             Log.e(TAG, "exception while closing output stream $e")
@@ -116,6 +110,7 @@ class WaveRecordingHandler(val context: Context): Activity() {
         audioRecord = null
         recordingThread = null
     }
+
     //Write to file .wav
     private fun writeAudioDataToFile(path:String) {
         val dataWav = arrayListOf<Byte>()
@@ -248,41 +243,79 @@ class WaveRecordingHandler(val context: Context): Activity() {
         data[42] = (contentSize shr 16 and 0xff).toByte()
         data[43] = (contentSize shr 24 and 0xff).toByte()
     }
+
     //---------------------------------------------------Playing Audio----------------------------------------------------------------------------------
-    fun playAudio(){
-        if (audioTrack == null) {
-            audioTrack = AudioTrack(
-                AudioAttributes.Builder()
-                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC )
-                    .setUsage(AudioAttributes.USAGE_MEDIA).build(),
-                AudioFormat.Builder()
-                    .setEncoding(RECORDER_AUDIO_ENCODING)
-                    .setSampleRate(RECORDER_SAMPLE_RATE)
-                    .setChannelMask(PLAYBACK_CHANNEL)
-                    .build(),
-                AudioTrack.getMinBufferSize(RECORDER_SAMPLE_RATE,PLAYBACK_CHANNEL,RECORDER_AUDIO_ENCODING),
-                AudioTrack.MODE_STREAM,
-                AudioManager.AUDIO_SESSION_ID_GENERATE
-            );
+    fun streaming() {
+        apiService = ApiService.client!!
+        playingThread = thread(true) {
+            apiService.sendAudio(audioToBinaryConverter(Helper.getLastRecFilePath()))
+        }
+    }
+    fun playAudio(audioByteArr:ByteArray){
+        if(!isPlayingAudio) {
+            var outputStream: FileOutputStream? = null
+            val fileName =
+                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).absolutePath + "/tempMP3" + ".mp3"
+            try {
+                outputStream = FileOutputStream(fileName)
+                // create temp file that will hold byte array
+                //val tempMp3 = File.createTempFile("AStreamer", "mp3", context.cacheDir)
+                // tempMp3.deleteOnExit()
+                outputStream.write(audioByteArr)
+                outputStream.flush()
+                outputStream.close()
 
-            if (audioTrack!!.state != AudioTrack.STATE_INITIALIZED) {
-                Toast.makeText(context, "Couldn't initialize AudioTrack, check configuration", Toast.LENGTH_SHORT).show()
-                Log.e(TAG, "error initializing AudioTrack")
-                return;
+            } catch (e: IOException) {
+
             }
+            if (audioTrack == null) {
+                audioTrack = AudioTrack(
+                    AudioAttributes.Builder()
+                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .setUsage(AudioAttributes.USAGE_MEDIA).build(),
+                    AudioFormat.Builder()
+                        .setEncoding(RECORDER_AUDIO_ENCODING)
+                        .setSampleRate(RECORDER_SAMPLE_RATE)
+                        .setChannelMask(PLAYBACK_CHANNEL)
+                        .build(),
+                    AudioTrack.getMinBufferSize(
+                        RECORDER_SAMPLE_RATE,
+                        PLAYBACK_CHANNEL,
+                        RECORDER_AUDIO_ENCODING
+                    ),
+                    AudioTrack.MODE_STREAM,
+                    AudioManager.AUDIO_SESSION_ID_GENERATE
+                )
 
-            audioTrack!!.play();
-            Log.d(TAG, "playback started with AudioTrack")
+                if (audioTrack!!.state != AudioTrack.STATE_INITIALIZED) {
+                    Toast.makeText(
+                        context,
+                        "Couldn't initialize AudioTrack, check configuration",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    Log.e(TAG, "error initializing AudioTrack")
+                    return
+                }
 
-            isPlayingAudio = true;
+                audioTrack!!.play()
+                Log.d(TAG, "playback started with AudioTrack")
 
-            playingThread = thread(true) {
-                readAudioDataFromFile(fileNameWave)
+                isPlayingAudio = true
+
+                playingThread = thread(true) {
+                    readAudioDataFromFile(fileName)
+                }
             }
         }
     }
     fun stopAudio(){
-        isPlayingAudio = false
+        if(isPlayingAudio){
+            isPlayingAudio = false
+            audioTrack!!.stop()
+            audioTrack!!.release()
+            audioTrack = null
+            playingThread = null
+        }
     }
 
     //Read Audio from a file
@@ -330,7 +363,21 @@ class WaveRecordingHandler(val context: Context): Activity() {
         audioTrack = null
         playingThread = null
     }
+    private fun audioToBinaryConverter(path:String?): ByteArray{
+        val bos = ByteArrayOutputStream()
+        try {
+            var fis =DataInputStream(FileInputStream(path))
+            val b = ByteArray(1024)
+            var readNum: Int
+            while (fis.read(b).also { readNum = it } != -1) {
+                bos.write(b, 0, readNum)
+            }
 
+        } catch (e: java.lang.Exception) {
+            Log.d("mylog", e.toString())
+        }
+        return bos.toByteArray()
+    }
     companion object {
         // for raw audio, use MediaRecorder.AudioSource.UNPROCESSED, see note in MediaRecorder section
         const val RECORDER_SAMPLE_RATE = 44100
@@ -347,9 +394,6 @@ class WaveRecordingHandler(val context: Context): Activity() {
         const val NUMBER_CHANNELS: Short = 1
         const val BYTE_RATE = RECORDER_SAMPLE_RATE * NUMBER_CHANNELS * 16 / 8
 
-        val filenamePcm = "mclef_recording_${System.currentTimeMillis()}"
-        val filenamemp3 = "mclef_recording_${System.currentTimeMillis()}.3gp"
-        val fileNameWav = "mclef_recording_${System.currentTimeMillis()}"
-
+        val filename = "mclef_recording_${System.currentTimeMillis()}"
     }
 }

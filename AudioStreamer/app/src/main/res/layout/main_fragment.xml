@@ -39,24 +39,20 @@
             android:orientation="vertical"
             tools:ignore="InefficientWeight">
 
-            <LinearLayout
+            <FrameLayout
+                android:id="@+id/progress_bar_container"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:layout_weight="1"
-                android:orientation="horizontal">
+                android:layout_marginTop="5dp">
 
                 <TextView
                     android:id="@+id/txtAudioInfo"
                     style="@style/header_text"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_gravity="center"
-                    android:gravity="center"
-                    android:text=""
-                    android:textColor="@color/black"
-                    android:textSize="15sp" />
-            </LinearLayout>
+                    android:progressBackgroundTint="@color/black"
+                    android:progressTint="@color/primaryTextColor" />
+            </FrameLayout>
         </LinearLayout>
     </LinearLayout>
     <LinearLayout
@@ -72,53 +68,45 @@
             android:id="@+id/bt_audio_recording"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Record (.Wav)"
+            android:text="Start Recording"
             android:visibility="visible"
             style="@style/primary_button"
             android:layout_marginBottom="10dp"
             />
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/bt_play_audio_wave"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Play (.Wav)"
-            android:visibility="invisible"
-            android:clickable="false"
-            style="@style/alternative_button"
-            android:layout_marginBottom="10dp"
-            />
+
         <com.google.android.material.button.MaterialButton
             android:id="@+id/bt_audio_recording_mp3"
+            style="@style/primary_button"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Record (.mp3)"
             android:layout_marginTop="15dp"
-            android:visibility="visible"
-            style="@style/primary_button"
             android:layout_marginBottom="10dp"
-            />
+            android:text="Record (.mp3)"
+            android:visibility="gone" />
+
         <com.google.android.material.button.MaterialButton
             android:id="@+id/bt_play_audio_mp3"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Play (.mp3)"
-            android:visibility="invisible"
+            android:visibility="gone"
             android:clickable="false"
             style="@style/alternative_button"
             android:layout_marginBottom="10dp"
             />
+
         <com.google.android.material.button.MaterialButton
             android:id="@+id/bt_start_streaming_audio"
+            style="@style/primary_button"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/upload_btn_text"
             android:layout_marginTop="15dp"
-            android:visibility="visible"
             android:layout_marginBottom="10dp"
-            style="@style/primary_button"
-            />
+            android:text="@string/upload_btn_text"
+            android:visibility="gone" />
+
         <com.google.android.material.button.MaterialButton
-            android:id="@+id/bt_stop_audio"
+            android:id="@+id/bt_stop_audio_streaming"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Stop Streaming"

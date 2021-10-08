@@ -23,22 +23,18 @@ import timber.log.Timber
 import java.io.*
 @AndroidEntryPoint
 class MainFragment: Fragment() {
-    private lateinit var  mediaPlayer:MediaPlayer
+    private lateinit var mediaPlayer: MediaPlayer
     private val selectAudio = 2
     private lateinit var viewModel: MainViewModel
     private lateinit var binding: MainFragmentBinding
     private val PERMISSION_REQUEST_CODE = 5
-    private var recordedFilePath = ""
-    private var  audioRecordingStart = false
+    private var audioRecordingStart = false
     private var isMp3RecorderStarted = false
-    private var  isAudioPlaying = false
+    private var isAudioPlaying = false
     companion object {
         fun newInstance() = MainFragment()
     }
-    override fun onCreateView(
-        inflater: LayoutInflater, container: ViewGroup?,
-        savedInstanceState: Bundle?
-    ): View {
+    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         binding = MainFragmentBinding.inflate(inflater, container, false)
         return binding.root
     }
@@ -50,92 +46,62 @@ class MainFragment: Fragment() {
                 requireContext(),
                 android.Manifest.permission.RECORD_AUDIO
             ) != PackageManager.PERMISSION_GRANTED
-        ) { // get permission
+        ) {
             ActivityCompat.requestPermissions(
                 requireContext() as Activity,
                 arrayOf(android.Manifest.permission.RECORD_AUDIO),
                 PERMISSION_REQUEST_CODE
             )
         }
-        binding.btStartStreamingAudio.setOnClickListener{
+        binding.btStartStreamingAudio.setOnClickListener {
             openGalleryAudio()
-        }
-        //mp3 recording handler
-        binding.btAudioRecordingMp3.setOnClickListener {
-            if(!isMp3RecorderStarted){
-                isMp3RecorderStarted = true
-                binding.btAudioRecordingMp3.text = "Stop Recording (.mp3)"
-                binding.txtAudioInfo.text = " Audio recording started .."
-                Mp3RecordPlaybackHandler(requireContext()).startRecordingMedia()
-            }else {
-                isMp3RecorderStarted = false
-                binding.btAudioRecordingMp3.text = " Record (.mp3)"
-                binding.txtAudioInfo.text = "Audio recording stopped .."
-                Mp3RecordPlaybackHandler(requireContext()).stopRecordingMedia()
-                binding.btPlayAudioMp3.visibility = View.VISIBLE
-            }
         }
 
         //.wave recording event handler
-        binding.btAudioRecording.setOnClickListener{
-            if(!audioRecordingStart) {
+        binding.btAudioRecording.setOnClickListener {
+            if (!audioRecordingStart) {
+                binding.btStartStreamingAudio.visibility = View.GONE
+                binding.btStopAudioStreaming.visibility = View.GONE
                 audioRecordingStart = true
-                binding.btAudioRecording.text = "Stop Recoding (.Wav)"
-                WaveRecordingHandler(requireContext()).startRecordingAudio()
-            }else {
+                binding.btAudioRecording.text = "Stop Recoding "
+                RecordingHandler(requireContext()).startRecordingAudio()
+            } else {
                 audioRecordingStart = false
-                binding.btAudioRecording.text = "Record (.Wav)"
+                binding.btAudioRecording.text = " Start Recording "
                 binding.txtAudioInfo.text = "Audio recording stopped .."
-                WaveRecordingHandler(requireContext()).stopRecordingAudio()
-                binding.btPlayAudioWave.visibility = View.VISIBLE
+                RecordingHandler(requireContext()).stopRecordingAudio()
+                binding.btStartStreamingAudio.visibility = View.VISIBLE
             }
         }
 
         //Audio play /pause function .wave
-        binding.btPlayAudioWave.setOnClickListener {
-            if(!isAudioPlaying) {
-                isAudioPlaying = true
-                binding.btPlayAudioWave.text = "Pause"
-                WaveRecordingHandler(requireContext()).playAudio()
-            }else {
-                isAudioPlaying = false
-                binding.btPlayAudioWave.text = "Play"
-                WaveRecordingHandler(requireContext()).stopAudio()
-            }
+        binding.btStartStreamingAudio.setOnClickListener {
+            binding.txtAudioInfo.text = "Audio streaming  started .."
+            RecordingHandler(requireContext()).streaming()
         }
-        //Play/pause mp3 audios
-        binding.btPlayAudioMp3.setOnClickListener {
-            if(!isAudioPlaying) {
-                isAudioPlaying = true
-                binding.btPlayAudioMp3.text = "Pause"
-                Mp3RecordPlaybackHandler(requireContext()).playMedia()
-            }else {
-                isAudioPlaying = false
-                binding.btPlayAudioMp3.text = "Play"
-                Mp3RecordPlaybackHandler(requireContext()).stopMedia()
-            }
+        binding.btStopAudioStreaming.setOnClickListener {
+            RecordingHandler(requireContext()).stopAudio()
         }
-
         viewModel.audioDataReceived.observe(viewLifecycleOwner, {
-            binding.btStopAudio.visibility = View.VISIBLE
+            binding.btStopAudioStreaming.visibility = View.VISIBLE
             binding.txtAudioInfo.text = "Audio data received.."
             if (it != null) {
-                playMp3(it)
-            }else {
-                binding.txtAudioInfo.text = "Wrong Audio data format. Please check with the server.."
+                RecordingHandler(requireContext()).playAudio(it)
+            } else {
+                binding.txtAudioInfo.text =
+                    "Wrong Audio data format. Please check with the server.."
             }
         })
         viewModel.textDataReceived.observe(viewLifecycleOwner, {
             binding.txtAudioInfo.text = "$it"
         })
     }
-    override fun onRequestPermissionsResult(requestCode: Int,
-                                            permissions: Array<String>, grantResults: IntArray) {
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
         when (requestCode) {
             PERMISSION_REQUEST_CODE -> {
                 // If request is cancelled, the result arrays are empty.
-                if ((grantResults.isNotEmpty() &&
-                            grantResults[0] == PackageManager.PERMISSION_GRANTED)) {
+                if ((grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED)) {
                     binding.txtAudioInfo.text = "Audio recording .."
                 } else {
                     // Explain to the user that the feature is unavailable because
@@ -154,8 +120,9 @@ class MainFragment: Fragment() {
             }
         }
     }
-    private fun sendAudio(data:ByteArray){
-      doAsync {
+
+    private fun sendAudio(data: ByteArray) {
+        doAsync {
             // do your background thread task
             viewModel.sendAudioData(data)
             uiThread {
@@ -164,32 +131,38 @@ class MainFragment: Fragment() {
             }
         }
     }
+
     //open Mobile gallery
-    private fun  openGalleryAudio(){
-       val intent = Intent()
+    private fun openGalleryAudio() {
+        val intent = Intent()
         intent.type = "audio/*"
         intent.action = Intent.ACTION_GET_CONTENT
-        startActivityForResult(Intent.createChooser(intent,"Select Audio "), selectAudio)
+        startActivityForResult(Intent.createChooser(intent, "Select Audio "), selectAudio)
     }
+
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (resultCode == AppCompatActivity.RESULT_OK) {
             if (requestCode == selectAudio) {
                 println("SELECT_AUDIO")
                 val selectedImageUri: Uri? = data!!.data
-                val file = File(createCopyAndReturnRealPath(requireContext(),selectedImageUri!!).toString())
+                val file = File(
+                    createCopyAndReturnRealPath(
+                        requireContext(),
+                        selectedImageUri!!
+                    ).toString()
+                )
                 //binding.txtAudioInfo.text = "Audio Selected and ready to stream .."
-                val binaryAudioData =  audioToBinaryConverter(file)
+                val binaryAudioData = audioToBinaryConverter(file)
                 //PUBLISH Data
                 binding.txtAudioInfo.text = "Audio data uploading .."
                 sendAudio(binaryAudioData)
             }
         }
     }
+
     //get real file path of selected audio
-    private fun createCopyAndReturnRealPath(
-        @NonNull context: Context, @NonNull uri: Uri?
-    ): String? {
+    private fun createCopyAndReturnRealPath(@NonNull context: Context, @NonNull uri: Uri?): String? {
         val contentResolver: ContentResolver = context.contentResolver ?: return null
 
         // Create file path inside app's data dir
@@ -209,10 +182,11 @@ class MainFragment: Fragment() {
         }
         return file.absolutePath
     }
-    private fun audioToBinaryConverter(audioFilePath:File): ByteArray{
+
+    private fun audioToBinaryConverter(audioFilePath: File): ByteArray {
         val bos = ByteArrayOutputStream()
         try {
-            var fis =DataInputStream(FileInputStream(audioFilePath))
+            val fis = DataInputStream(FileInputStream(audioFilePath))
             val b = ByteArray(1024)
             var readNum: Int
             while (fis.read(b).also { readNum = it } != -1) {
@@ -223,38 +197,5 @@ class MainFragment: Fragment() {
             Timber.d(e.toString())
         }
         return bos.toByteArray()
-    }
-    //Convert and play received audio data
-    private fun playMp3(mp3SoundByteArray: ByteArray) {
-        try {
-            mediaPlayer = MediaPlayer()
-            binding.txtAudioInfo.text =  "Audio Data Processing... "
-            // create temp file that will hold byte array
-            val tempMp3 = File.createTempFile("AStreamer", "mp3", context?.cacheDir)
-            tempMp3.deleteOnExit()
-            val fos = FileOutputStream(tempMp3)
-            fos.write(mp3SoundByteArray)
-            fos.close()
-
-            // resetting mediaplayer instance to evade problems
-            mediaPlayer.reset()
-            binding.txtAudioInfo.text =  "Media Player Starting... "
-
-            // In case you run into issues with threading consider new instance like:
-            // MediaPlayer mediaPlayer = new MediaPlayer();
-
-            // Tried passing path directly, but kept getting
-            // "Prepare failed.: status=0x1"
-            // so using file descriptor instead
-            val fis = FileInputStream(tempMp3)
-            mediaPlayer.setDataSource(fis.fd)
-            mediaPlayer.prepare()
-            binding.txtAudioInfo.text =  "Audio streaming... "
-            mediaPlayer.start()
-
-        } catch (ex: IOException) {
-            val s = ex.toString()
-            ex.printStackTrace()
-        }
     }
 }

@@ -46,6 +46,7 @@ class Mp3RecordPlaybackHandler(val context: Context) {
     var isRecordingMedia = false
     var isPlayingMedia = false
 
+
     var fileNameMediaMp3: String? =  Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).absolutePath +  "/$filenamemp3"
     //---------------------------------------------------Recording Audio ---------------------------
     fun startRecordingMedia(){
@@ -61,8 +62,8 @@ class Mp3RecordPlaybackHandler(val context: Context) {
                 }
                 mediaRecorder!!.setAudioSource(MediaRecorder.AudioSource.MIC)
                 mediaRecorder!!.setAudioSamplingRate(RECORDER_SAMPLE_RATE)
-                mediaRecorder!!.setOutputFile(fileNameMediaMp3)
                 mediaRecorder!!.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+                mediaRecorder!!.setOutputFile(fileNameMediaMp3)
                 mediaRecorder!!.setAudioEncoder(MediaRecorder.AudioEncoder.AMR_WB)
                 try {
                     mediaRecorder!!.prepare()
@@ -119,7 +120,6 @@ class Mp3RecordPlaybackHandler(val context: Context) {
             start()
         }
     }
-
     fun stopMedia(){
         if (mediaPlayer != null) {
             mediaPlayer!!.release()
